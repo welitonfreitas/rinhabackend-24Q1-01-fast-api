@@ -1,0 +1,7 @@
+
+
+services:
+    api01:
+        build: .
+    api02:
+        build: .

@@ -1,0 +1,80 @@
+version: "3"
+name: "rinhanginx2024q1"
+
+services:
+  traefik:
+    image: "traefik:latest"
+    container_name: "traefik"
+    command:
+      #- "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--entrypoints.web.address=:9999"
+    ports:
+      - "9999:9999"
+    depends_on:
+      - api01
+      - api02
+    deploy:
+      resources:
+        limits:
+          cpus: "0.17"
+          memory: "10MB"
+  api01:
+    image: "welitonfreitas:latest"
+    container_name: "api01"
+    labels:
+      - "traefik.enable=true"
+      #- "traefik.http.routers.api01.rule=Host(`api01.rinha.com`)"
+      - "traefik.http.routers.api01.entrypoints=web"
+      - "traefik.http.routers.api01.service=api01"
+      - "traefik.http.services.api01.loadbalancer.server.port=80"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.17"
+          memory: "10MB"
+  api02:
+    image: "welitonfreitas:latest"
+    container_name: "api02"
+    labels:
+      - "traefik.enable=true"
+      #- "traefik.http.routers.api02.rule=Host(`api02.rinha.com`)"
+      - "traefik.http.routers.api02.entrypoints=web"
+      - "traefik.http.routers.api02.service=api02"
+      - "traefik.http.services.api02.loadbalancer.server.port=80"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.17"
+          memory: "10MB"
+  db:
+    image: postgres:latest
+    hostname: db
+    environment:
+      - POSTGRES_PASSWORD=123
+      - POSTGRES_USER=admin
+      - POSTGRES_DB=rinha
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./script.sql:/docker-entrypoint-initdb.d/script.sql
+    deploy:
+      resources:
+        limits:
+          # Note que a soma de todos os limites dos serviços
+          # aqui declarados é de 1.5 unidades de CPU e 550MB
+          # de memória. A distribuição feita aqui é apenas
+          # um exemplo – distribua como quiser.
+          cpus: "0.13"
+          memory: "140MB"
+
+# O uso do modo `bridge` deve ser adequado à carga que será usada no teste.
+# A edição anterior se beneficiou do modo host pois o volume de requisições
+# era relativamente alto e a virtualização da rede se tornou um gargalo, mas
+# este modo é mais complexo de ser configurado. Fique à vontade para usar o
+# modo que quiser desde que não conflite com portas trivialmente usadas em um
+# SO.
+networks:
+  default:
+    driver: bridge
+    name: rinha-nginx-2024q1
