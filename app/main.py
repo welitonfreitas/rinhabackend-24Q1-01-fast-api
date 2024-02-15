@@ -24,6 +24,8 @@ def create_transactions(client_id: int, transaction: Transaction, db: Session = 
         return services.create_client_transaction(db, transaction, client_id)
     except services.ClienteNotFound:
         raise HTTPException(status_code=404, detail="Client not found")
+    except services.SaldoInsuficiente:
+        raise HTTPException(status_code=422, detail="Insufficient balance")
 
 @app.get("/clientes/{client_id}/extrato", response_model=ExtratoResponse)
 def get_transactions(client_id, db: Session = Depends(get_db)):

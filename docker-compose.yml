@@ -1,72 +1,79 @@
 version: "3"
-name: "rinhanginx2024q1"
+name: rinhanginx2024q1
 
 services:
-  traefik:
-    image: "traefik:latest"
-    container_name: "traefik"
-    command:
-      #- "--log.level=DEBUG"
-      - "--api.insecure=true"
-      - "--entrypoints.web.address=:9999"
+  proxy:
+    image: nginx:latest
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "9999:9999"
     depends_on:
       - api01
       - api02
-    deploy:
-      resources:
-        limits:
-          cpus: "0.17"
-          memory: "10MB"
-  api01:
-    image: "welitonfreitas:latest"
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: "0.30"
+    #       memory: "200MB"
+  api01: &app
+    image: welitonFreitas_rinha_2024q1:latest
     container_name: "api01"
-    labels:
-      - "traefik.enable=true"
-      #- "traefik.http.routers.api01.rule=Host(`api01.rinha.com`)"
-      - "traefik.http.routers.api01.entrypoints=web"
-      - "traefik.http.routers.api01.service=api01"
-      - "traefik.http.services.api01.loadbalancer.server.port=80"
-    deploy:
-      resources:
-        limits:
-          cpus: "0.17"
-          memory: "10MB"
-  api02:
-    image: "welitonfreitas:latest"
-    container_name: "api02"
-    labels:
-      - "traefik.enable=true"
-      #- "traefik.http.routers.api02.rule=Host(`api02.rinha.com`)"
-      - "traefik.http.routers.api02.entrypoints=web"
-      - "traefik.http.routers.api02.service=api02"
-      - "traefik.http.services.api02.loadbalancer.server.port=80"
-    deploy:
-      resources:
-        limits:
-          cpus: "0.17"
-          memory: "10MB"
-  db:
-    image: postgres:latest
-    hostname: db
     environment:
-      - POSTGRES_PASSWORD=123
-      - POSTGRES_USER=admin
-      - POSTGRES_DB=rinha
+      - PG_HOST=rinha-db
+      - PG_PORT=5432
+      - PG_USER=postgres
+      - PG_PASSWORD=postgres
+      - PG_DB=rinha_db
+      - PG_POOL=50
+    # links: 
+    #   - rinha-db
     ports:
-      - "5432:5432"
+      - "9998:80"
+    depends_on:
+      - rinha-db
+    expose:
+      - 5432:5432
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: "0.17"
+    #       memory: "200MB"
+  api02: 
+    <<: *app
+    container_name: "api02"
+    ports:
+      - "9997:80"
+  
+  rinha-db:
+    image: postgres:latest
+    hostname: rinha-db
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=rinha_db
+    ports:
+      - "5430:5432"
     volumes:
       - ./script.sql:/docker-entrypoint-initdb.d/script.sql
-    deploy:
-      resources:
-        limits:
-          # Note que a soma de todos os limites dos serviços
-          # aqui declarados é de 1.5 unidades de CPU e 550MB
-          # de memória. A distribuição feita aqui é apenas
-          # um exemplo – distribua como quiser.
-          cpus: "0.13"
-          memory: "140MB"
+    # deploy:
+    #   resources:
+    #     limits:
+    #       # Note que a soma de todos os limites dos serviços
+    #       # aqui declarados é de 1.5 unidades de CPU e 550MB
+    #       # de memória. A distribuição feita aqui é apenas
+    #       # um exemplo – distribua como quiser.
+    #       cpus: "0.20"
+    #       memory: "150MB"
+  pgadmin4:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "notilew@gmail.com"
+      PGADMIN_DEFAULT_PASSWORD: "notilew00"
+    ports:
+      - "16543:80"
+    depends_on:
+      - rinha-db
 
 # O uso do modo `bridge` deve ser adequado à carga que será usada no teste.
 # A edição anterior se beneficiou do modo host pois o volume de requisições
@@ -77,4 +84,4 @@ services:
 networks:
   default:
     driver: bridge
-    name: rinha-nginx-2024q1
+    name: rinha-2024q1

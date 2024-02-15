@@ -2,9 +2,13 @@ import datetime
 from app.schemas import SaldoResponse, Transaction, Saldo, ExtratoResponse, TransactionResponse
 from app.models import Transacao, Cliente
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 
 
 class ClienteNotFound(Exception):
+    pass
+
+class SaldoInsuficiente(Exception):
     pass
 
 def get_extrato(db: Session, client_id: int):
@@ -17,7 +21,7 @@ def get_extrato(db: Session, client_id: int):
     limite = cliente.limite
     saldo = Saldo(total=total, limite=limite, data_extrato=datetime.datetime.utcnow())
     transacoes_response = [
-            TransactionResponse(**transacao) for transacao in transacoes
+            TransactionResponse(**transacao.__dict__) for transacao in transacoes
         ]
     return ExtratoResponse(saldo=saldo, ultimas_transacoes=transacoes_response)
 
@@ -26,15 +30,24 @@ def get_cliente(db: Session, client_id: int):
 
 
 def get_transactions(db: Session, client_id: int, skip: int = 0, limit: int = 10):
-    return db.query(Transacao).filter(Transacao.cliente_id == client_id).offset(skip).limit(limit).all()
+    return db.query(Transacao).filter(Transacao.cliente_id == client_id).order_by(desc(Transacao.realizada_em)).offset(skip).limit(limit).all()
 
 def create_client_transaction(db: Session, transaction: Transaction, client_id: int):
     cliente = get_cliente(db, client_id)
     if not cliente:
         raise ClienteNotFound()
 
-    db_transaction = Transacao(**transaction.dict(), cliente_id=client_id)
+    if transaction.tipo == "d" and cliente.saldo - transaction.valor < -cliente.limite:
+        raise SaldoInsuficiente()
+    
+    db_transaction = Transacao(**transaction.model_dump(), cliente_id=client_id)
     db.add(db_transaction)
+
+    if transaction.tipo == "d":
+        cliente.saldo -= db_transaction.valor
+    else:
+        cliente.saldo += db_transaction.valor
+    
     db.commit()
-    db.refresh(db_transaction)
-    return SaldoResponse(saldo=1000, limite=1000)
+    
+    return SaldoResponse(saldo=cliente.saldo, limite=cliente.limite)
