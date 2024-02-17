@@ -24,6 +24,7 @@ services:
       - PG_PORT=5432
       - PG_DB=rinha_db
       - PG_POOL=18
+      - ENABLE_TIMING_COUT=True
     # links: 
     #   - rinha-db
     ports:
