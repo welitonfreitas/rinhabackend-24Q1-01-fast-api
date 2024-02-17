@@ -18,18 +18,13 @@ class SaldoResponse(BaseModel):
 
 class TransactionResponse(Transaction):
     realizada_em: datetime.datetime
-    class Config:
-        orm_mode = True
+
 
 class Saldo(BaseModel):
     total: Optional[int] = 0
     data_extrato: datetime.datetime
     limite: int
-    class Config:
-        orm_mode = True
 
 class ExtratoResponse(BaseModel):
     saldo: Saldo
     ultimas_transacoes: List[TransactionResponse]
-    class Config:
-        orm_mode = True

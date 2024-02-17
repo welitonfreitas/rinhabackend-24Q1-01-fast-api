@@ -1,6 +1,4 @@
 fastapi
 pydantic
 uvicorn
-sqlalchemy
-sqlalchemy-stubs
 psycopg2-binary

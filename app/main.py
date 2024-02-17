@@ -1,25 +1,25 @@
-import datetime
 from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session
-from app.models import Base
-from app.database import SessionLocal, engine
+from psycopg2.extensions import connection
+from app.database import Pool
 from app import services
 from app.schemas import Transaction, SaldoResponse, ExtratoResponse
 
-Base.metadata.create_all(bind=engine)
 
 # Dependency
 def get_db():
-    db = SessionLocal()
+    connection = Pool.getconn()
+    db = connection.cursor()
     try:
         yield db
     finally:
+        connection.commit()
         db.close()
+        Pool.putconn(connection)
 
 app = FastAPI()
 
 @app.post("/clientes/{client_id}/transacoes", response_model=SaldoResponse)
-def create_transactions(client_id: int, transaction: Transaction, db: Session = Depends(get_db)):
+def create_transactions(client_id: int, transaction: Transaction, db: connection = Depends(get_db)):
     try:
         return services.create_client_transaction(db, transaction, client_id)
     except services.ClienteNotFound:
@@ -28,7 +28,7 @@ def create_transactions(client_id: int, transaction: Transaction, db: Session = 
         raise HTTPException(status_code=422, detail="Insufficient balance")
 
 @app.get("/clientes/{client_id}/extrato", response_model=ExtratoResponse)
-def get_transactions(client_id, db: Session = Depends(get_db)):
+def get_transactions(client_id, db: connection = Depends(get_db)):
     try:
         return services.get_extrato(db, client_id)
     except services.ClienteNotFound:

@@ -1,9 +1,6 @@
 import datetime
 from app.schemas import SaldoResponse, Transaction, Saldo, ExtratoResponse, TransactionResponse
-from app.models import Transacao, Cliente
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
-
+from psycopg2.extensions import connection
 
 class ClienteNotFound(Exception):
     pass
@@ -11,43 +8,48 @@ class ClienteNotFound(Exception):
 class SaldoInsuficiente(Exception):
     pass
 
-def get_extrato(db: Session, client_id: int):
+def get_extrato(db: connection, client_id: int):
     cliente =  get_cliente(db, client_id)
-    if not cliente:
-        raise ClienteNotFound()
-    
     transacoes = get_transactions(db, client_id)
-    total = cliente.saldo
-    limite = cliente.limite
+    
+    total = cliente[0]
+    limite = cliente[1]
+    
     saldo = Saldo(total=total, limite=limite, data_extrato=datetime.datetime.utcnow())
     transacoes_response = [
-            TransactionResponse(**transacao.__dict__) for transacao in transacoes
+            TransactionResponse(valor=transacao[0], tipo=transacao[1], descricao=transacao[2], realizada_em=transacao[3]) for transacao in transacoes
         ]
     return ExtratoResponse(saldo=saldo, ultimas_transacoes=transacoes_response)
 
-def get_cliente(db: Session, client_id: int):
-    return db.query(Cliente).filter(Cliente.id == client_id).first()
-
-
-def get_transactions(db: Session, client_id: int, skip: int = 0, limit: int = 10):
-    return db.query(Transacao).filter(Transacao.cliente_id == client_id).order_by(desc(Transacao.realizada_em)).offset(skip).limit(limit).all()
-
-def create_client_transaction(db: Session, transaction: Transaction, client_id: int):
-    cliente = get_cliente(db, client_id)
-    if not cliente:
+def get_cliente(db: connection, client_id: int):
+    db.execute("SELECT saldo, limite FROM clientes WHERE id = %s", (client_id,))
+    client = db.fetchone()
+    print(client)
+    if not client:
         raise ClienteNotFound()
+    return client
 
-    if transaction.tipo == "d" and cliente.saldo - transaction.valor < -cliente.limite:
+
+def get_transactions(db: connection, client_id: int, skip: int = 0, limit: int = 10):
+    db.execute("SELECT valor, tipo, descricao, realizada_em FROM transacoes WHERE cliente_id = %s ORDER BY realizada_em DESC OFFSET %s LIMIT %s", (client_id, skip, limit))
+    return db.fetchall()
+
+def create_client_transaction(db: connection, transaction: Transaction, client_id: int):
+    cliente = get_cliente(db, client_id)
+
+    saldo = cliente[0]
+    limite = cliente[1]
+    novo_saldo = saldo + transaction.valor if transaction.tipo == "c" else saldo - transaction.valor
+
+    if transaction.tipo == "d" and (saldo - transaction.valor) < -limite:
         raise SaldoInsuficiente()
-    
-    db_transaction = Transacao(**transaction.model_dump(), cliente_id=client_id)
-    db.add(db_transaction)
 
-    if transaction.tipo == "d":
-        cliente.saldo -= db_transaction.valor
-    else:
-        cliente.saldo += db_transaction.valor
+    now = datetime.datetime.utcnow()
+    insert = """
+    INSERT INTO transacoes (tipo, valor, descricao, cliente_id, realizada_em) VALUES (%s, %s, %s, %s, %s);
+    UPDATE clientes SET saldo = %s WHERE id = %s;
+    """
+
+    db.execute(insert, (transaction.tipo.value, transaction.valor, transaction.descricao, client_id, now, novo_saldo, client_id))
     
-    db.commit()
-    
-    return SaldoResponse(saldo=cliente.saldo, limite=cliente.limite)
+    return SaldoResponse(saldo=novo_saldo, limite=limite)
