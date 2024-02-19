@@ -29,7 +29,7 @@ def get_extrato(client_id: int):
         ]
     return ExtratoResponse(saldo=saldo, ultimas_transacoes=transacoes_response)
 
-def cliente_exists(client_id: int):
+def client_exists(client_id: int):
     client = client_cache.get(client_id, None)
     if client:
         return client.get("exists", False)
@@ -60,26 +60,20 @@ def create_client_transaction(transaction: Transaction, client_id: int):
     limite = 0
     with get_db() as db:
         cliente = get_cliente(db, client_id)
-        print(cliente)
         saldo = cliente[0]
         limite = cliente[1]
-        novo_saldo = saldo + transaction.valor if transaction.tipo == "c" else saldo - transaction.valor
-        print(novo_saldo)
-        print(saldo)
-        print(transaction.tipo)
-        print(transaction.valor)
-        print(limite)
-
-        if transaction.tipo == "d" and (saldo - transaction.valor) < -limite:
-            print("Saldo insuficiente")
-            return {"error": "Insufficient balance", "status_code": 422}
-
-        now = datetime.datetime.utcnow()
+        valor = transaction.valor
+        
+        if transaction.tipo == "d":
+            if ((saldo + limite) - valor) <= 0:
+                print("Saldo insuficiente")
+                return {"error": "Insufficient balance", "status_code": 422}
+            valor = -transaction.valor
+        
         insert = """
         INSERT INTO transacoes (tipo, valor, descricao, cliente_id, realizada_em) VALUES (%s, %s, %s, %s, %s);
-        UPDATE clientes SET saldo = %s WHERE id = %s;
+        UPDATE clientes SET saldo = saldo + %s WHERE id = %s;
         """
-
-        db.execute(insert, (transaction.tipo.value, transaction.valor, transaction.descricao, client_id, now, novo_saldo, client_id))
-    
-    return SaldoResponse(saldo=novo_saldo, limite=limite)
+        now = datetime.datetime.utcnow()
+        db.execute(insert, (transaction.tipo.value, transaction.valor, transaction.descricao, client_id, now, valor, client_id))
+    return SaldoResponse(saldo=saldo + valor, limite=limite)

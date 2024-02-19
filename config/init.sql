@@ -20,6 +20,20 @@ BEGIN
     FOREIGN KEY (cliente_id) REFERENCES clientes(id)
   );
 
+  -- create function atualiza_saldo() returns trigger as $$
+  -- begin
+  --   if new.tipo = 'C' then
+  --     update clientes set saldo = saldo + new.valor where id = new.cliente_id;
+  --   else
+  --     update clientes set saldo = saldo - new.valor where id = new.cliente_id;
+  --   end if;
+  --   return new;
+  -- end;
+  -- $$ language plpgsql;
+
+  -- create trigger atualiza_saldo after insert on transacoes for each row execute function atualiza_saldo();
+
+
   INSERT INTO clientes (nome, limite, saldo)
   VALUES
     ('o barato sai caro', 1000 * 100, 0),

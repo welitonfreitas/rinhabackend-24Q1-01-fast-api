@@ -15,7 +15,7 @@ services:
       resources:
         limits:
           cpus: "0.2"
-          memory: "10MB"
+          memory: "20MB"
   api01: &app
     image: welitonfreitas_rinha_2024q1:latest
     container_name: "api01"
@@ -24,11 +24,9 @@ services:
       - PG_PORT=5432
       - PG_DB=rinha_db
       - PG_POOL=18
-      - ENABLE_TIMING_COUT=True
+      - ENABLE_TIMING_COUNT=True
     # links: 
     #   - rinha-db
-    ports:
-      - "9998:80"
     depends_on:
       - rinha-db
     expose:
@@ -37,12 +35,10 @@ services:
       resources:
         limits:
           cpus: "0.4"
-          memory: "165MB"
+          memory: "175MB"
   api02: 
     <<: *app
     container_name: "api02"
-    ports:
-      - "9997:80"
   
   rinha-db:
     image: postgres:16.2-alpine3.19
@@ -65,7 +61,7 @@ services:
           # de memória. A distribuição feita aqui é apenas
           # um exemplo – distribua como quiser.
           cpus: "0.5"
-          memory: "230MB"
+          memory: "200MB"
   pgadmin4:
     image: dpage/pgadmin4
     environment:
