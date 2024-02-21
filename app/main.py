@@ -12,7 +12,7 @@ app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-ENABLE_TIMING_COUNT = bool(os.getenv("ENABLE_TIMING_COUNT") or False)
+ENABLE_TIMING_COUNT = bool(os.getenv("ENABLE_TIMING") or False)
 
 if ENABLE_TIMING_COUNT:
     from fastapi_utils.timing import add_timing_middleware
@@ -25,7 +25,8 @@ logger = logging.getLogger(__name__)
 @app.post("/clientes/{client_id}/transacoes")
 async def create_transactions(client_id: int, transaction: Transaction, response: Response):
     
-    if not services.client_exists(client_id):
+    client_exit, _ = services.client_exists(client_id)
+    if not client_exit:
         response.status_code = 404
         return {"detail": "Client not found"}
     
@@ -38,7 +39,8 @@ async def create_transactions(client_id: int, transaction: Transaction, response
 
 @app.get("/clientes/{client_id}/extrato")
 async def get_transactions(client_id, response: Response):
-    if not services.client_exists(client_id):
+    client_exit, _ = services.client_exists(client_id)
+    if not client_exit:
         response.status_code = 404
         return {"detail": "Client not found"}
     

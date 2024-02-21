@@ -3,7 +3,6 @@ from app.schemas import SaldoResponse, Transaction, Saldo, ExtratoResponse, Tran
 from psycopg2.extensions import connection
 from app.database import get_db
 
-
 # criar objeto de cache em memoria para consultas de cliente
 
 client_cache = {}
@@ -32,16 +31,16 @@ def get_extrato(client_id: int):
 def client_exists(client_id: int):
     client = client_cache.get(client_id, None)
     if client:
-        return client.get("exists", False)
+        return client.get("exists", False), client.get("limite", 0)
 
     with get_db() as db:
         client = get_cliente(db, client_id)
         if not client:
-            client_cache[client_id] = {"exists": False}
-            return False
+            client_cache[client_id] = {"exists": False, "limite": 0}
+            return False, 0
         else:
-            client_cache[client_id] = {"exists": True}
-            return True
+            client_cache[client_id] = {"exists": True, "limite": client[1]}
+            return True, client[1]
     
 
 def get_cliente(db: connection, client_id: int):
@@ -55,25 +54,24 @@ def get_transactions(db: connection, client_id: int, skip: int = 0, limit: int =
     return db.fetchall()
 
 def create_client_transaction(transaction: Transaction, client_id: int):
-    
-    novo_saldo = 0
-    limite = 0
+
+    _, limite = client_exists(client_id)
+    saldo = 0
+    valor = transaction.valor
+    now = datetime.datetime.utcnow()
     with get_db() as db:
-        cliente = get_cliente(db, client_id)
-        saldo = cliente[0]
-        limite = cliente[1]
-        valor = transaction.valor
-        
         if transaction.tipo == "d":
-            if ((saldo + limite) - valor) <= 0:
-                print("Saldo insuficiente")
-                return {"error": "Insufficient balance", "status_code": 422}
             valor = -transaction.valor
         
+        try:
+            db.execute("select altera_saldo_cliente(%s, %s);", (client_id, valor))
+            saldo = db.fetchone()[0]
+        except Exception as e:
+            return {"error": "Insufficient balance", "status_code": 422}
+
         insert = """
         INSERT INTO transacoes (tipo, valor, descricao, cliente_id, realizada_em) VALUES (%s, %s, %s, %s, %s);
-        UPDATE clientes SET saldo = saldo + %s WHERE id = %s;
         """
-        now = datetime.datetime.utcnow()
-        db.execute(insert, (transaction.tipo.value, transaction.valor, transaction.descricao, client_id, now, valor, client_id))
-    return SaldoResponse(saldo=saldo + valor, limite=limite)
+        db.execute(insert, (transaction.tipo.value, transaction.valor, transaction.descricao, client_id, now))
+    
+    return SaldoResponse(saldo=saldo, limite=limite)

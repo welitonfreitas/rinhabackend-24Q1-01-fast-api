@@ -5,7 +5,7 @@ services:
   proxy:
     image: nginx:latest
     volumes:
-      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx.conf:/etc/nginx/nginx.conf
     ports:
       - "9999:9999"
     depends_on:
@@ -15,18 +15,16 @@ services:
       resources:
         limits:
           cpus: "0.2"
-          memory: "20MB"
+          memory: "50MB"
   api01: &app
-    image: welitonfreitas_rinha_2024q1:latest
+    image: notilew/rinha-24q1:latest
     container_name: "api01"
     environment:
       - PG_HOST=rinha-db
       - PG_PORT=5432
       - PG_DB=rinha_db
       - PG_POOL=18
-      - ENABLE_TIMING_COUNT=True
-    # links: 
-    #   - rinha-db
+      - ENABLE_TIMING=False
     depends_on:
       - rinha-db
     expose:
@@ -35,7 +33,7 @@ services:
       resources:
         limits:
           cpus: "0.4"
-          memory: "175MB"
+          memory: "150MB"
   api02: 
     <<: *app
     container_name: "api02"
@@ -56,28 +54,8 @@ services:
     deploy:
       resources:
         limits:
-          # Note que a soma de todos os limites dos serviços
-          # aqui declarados é de 1.5 unidades de CPU e 550MB
-          # de memória. A distribuição feita aqui é apenas
-          # um exemplo – distribua como quiser.
           cpus: "0.5"
           memory: "200MB"
-  pgadmin4:
-    image: dpage/pgadmin4
-    environment:
-      PGADMIN_DEFAULT_EMAIL: "notilew@gmail.com"
-      PGADMIN_DEFAULT_PASSWORD: "notilew00"
-    ports:
-      - "16543:80"
-    depends_on:
-      - rinha-db
-
-# O uso do modo `bridge` deve ser adequado à carga que será usada no teste.
-# A edição anterior se beneficiou do modo host pois o volume de requisições
-# era relativamente alto e a virtualização da rede se tornou um gargalo, mas
-# este modo é mais complexo de ser configurado. Fique à vontade para usar o
-# modo que quiser desde que não conflite com portas trivialmente usadas em um
-# SO.
 networks:
   default:
     driver: bridge
